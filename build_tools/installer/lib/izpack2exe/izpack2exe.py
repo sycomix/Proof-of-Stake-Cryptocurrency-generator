@@ -60,11 +60,7 @@ def parse_options():
     return options
 
 def create_exe(settings):
-    if len(settings.file) > 0:
-        filename = os.path.basename(settings.file[0])
-    else:
-        filename = ''
-    
+    filename = os.path.basename(settings.file[0]) if len(settings.file) > 0 else ''
     if len(settings.with_jre) > 0:
         jdk = os.path.basename(settings.with_jre) #inside the jdk/jre that was given, there must be a bin/java.exe file
         jdk = jdk + "\\bin\\javaw.exe"
@@ -72,61 +68,56 @@ def create_exe(settings):
         settings.file.append(settings.with_jre) #jdk/jre is going in the package
     else:
         jdk = 'javaw' #java is added somehow to the PATH
-    
+
     if settings.p7z == '7za':
         p7z = os.path.join(os.path.dirname(sys.argv[0]), '7za')
     else:
         p7z = settings.p7z
-    
+
     use_shell = sys.platform != 'win32'
-    
+
     if (os.access('installer.7z', os.F_OK)):
         os.remove('installer.7z')
     files = '" "'.join(settings.file)
-    p7zcmd = '"%s" a -mmt -t7z -mx=9 installer.7z "%s"' % (p7z, files)
+    p7zcmd = f'"{p7z}" a -mmt -t7z -mx=9 installer.7z "{files}"'
     print(p7zcmd)
     subprocess.call(p7zcmd, shell=use_shell)
-    
-    config = open('config.txt', 'w')
-    config.write(';!@Install@!UTF-8!\n')
-    config.write('Title="%s"\n' % settings.name)
-    if settings.prompt:
-        config.write('BeginPrompt="Install %s?"\n' % settings.name)
-    config.write('Progress="yes"\n')
-    
-    if settings.launch == '':
-        config.write('ExecuteFile="' + jdk +'"\n') # who is going to run my installer.jar?
-        config.write('ExecuteParameters="-jar \\\"%s\\\"' % filename)
-        if settings.launchargs != '':
-            config.write(' %s"\n' % settings.launchargs)
-        else:
-            config.write('"\n') 
-    else:
-        config.write('ExecuteFile="%s"\n' % settings.launch)
-        if settings.launchargs != '':
-            config.write('ExecuteParameters="%s"\n' % settings.launchargs)
 
-    config.write(';!@InstallEnd@!\n')
-    config.close()
-    
+    with open('config.txt', 'w') as config:
+        config.write(';!@Install@!UTF-8!\n')
+        config.write('Title="%s"\n' % settings.name)
+        if settings.prompt:
+            config.write('BeginPrompt="Install %s?"\n' % settings.name)
+        config.write('Progress="yes"\n')
+
+        if settings.launch == '':
+            config.write(f'ExecuteFile="{jdk}' + '"\n')
+            config.write('ExecuteParameters="-jar \\\"%s\\\"' % filename)
+            if settings.launchargs != '':
+                config.write(' %s"\n' % settings.launchargs)
+            else:
+                config.write('"\n')
+        else:
+            config.write('ExecuteFile="%s"\n' % settings.launch)
+            if settings.launchargs != '':
+                config.write('ExecuteParameters="%s"\n' % settings.launchargs)
+
+        config.write(';!@InstallEnd@!\n')
     sfx = os.path.join(os.path.dirname(p7z), '7zS.sfx')
     files = [sfx, 'config.txt', 'installer.7z']
-    
-    output = open(settings.output, 'wb')
-    for f in files:
-        in_file = open(f, 'rb')
-        shutil.copyfileobj(in_file, output, 2048)
-        in_file.close()
-    output.close()
-    
+
+    with open(settings.output, 'wb') as output:
+        for f in files:
+            with open(f, 'rb') as in_file:
+                shutil.copyfileobj(in_file, output, 2048)
     if (not settings.no_upx):
         if settings.upx == 'upx':
             upx = os.path.join(os.path.dirname(sys.argv[0]), 'upx')
         else:
             upx = settings.upx
-        upx = '"%s" --ultra-brute "%s"' % (upx, settings.output)
+        upx = f'"{upx}" --ultra-brute "{settings.output}"'
         subprocess.call(upx, shell=use_shell)
-    
+
     os.remove('config.txt')
     os.remove('installer.7z')
 
